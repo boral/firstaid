@@ -1,0 +1,8 @@
+streamlit
+pandas
+yfinance
+yesg
+nltk
+plotly
+generativeai
+base64
