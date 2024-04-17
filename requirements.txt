@@ -4,4 +4,4 @@ yfinance
 yesg
 nltk
 plotly
-generativeai
+google-generativeai
