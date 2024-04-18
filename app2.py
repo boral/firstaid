@@ -9,6 +9,7 @@ from nltk.sentiment.vader import SentimentIntensityAnalyzer
 import plotly.express as px
 import google.generativeai as genai
 import nltk
+from datetime import datetime
 
 
 # os.chdir('E:\projects\data_quest')
@@ -34,36 +35,61 @@ def FinancialScore(comp,Para):
         df=pd.DataFrame()
         print(comp)
         companyData = yf.Ticker(comp)
-
+        
         #Balance sheet
+        df10=Para[Para['Segment']=='Balance sheet'][['Variable', 'Imputation']]
         df1=companyData.quarterly_balance_sheet.reset_index()
         if df1.empty:
             #blank1.append(comp)
             print("Balance sheet data unavailable.")
+            #setting as imputed value
+            df1=df10[['Variable']]#pd.DataFrame()#Para[Para['Segment']=='Balance sheet'][['Variable', 'Imputation']]
         df1.rename(columns={'index':'Variable'}, inplace=True)
-        df=pd.concat([df,df1])
-
+        df12=df10.merge(df1, how='left', on='Variable')
+        df=pd.concat([df,df12])
+        df.reset_index(drop=True, inplace=True)
+        #print("Balance")
+        #print(df)
+        
         #cash flow
+        df30=Para[Para['Segment']=='Cash flow'][['Variable', 'Imputation']]
         df3=companyData.quarterly_cash_flow.reset_index()
         if df3.empty:
             #blank3.append(comp)
             print("Cash flow data unavailable.")
+            #setting as imputed value
+            df3=df30[['Variable']]#pd.DataFrame()#Para[Para['Segment']=='Cash flow'][['Variable', 'Imputation']]
         df3.rename(columns={'index':'Variable'}, inplace=True)
-        df=pd.concat([df,df3])
-
+        df32=df30.merge(df3, how='left', on='Variable')
+        df=pd.concat([df,df32])
+        df.reset_index(drop=True, inplace=True)
+        #print("cash")
+        #print(df)
+        
         #financials
+        df40=Para[Para['Segment']=='Financials'][['Variable', 'Imputation']]
         df4=companyData.quarterly_financials.reset_index()
         if df4.empty:
             #blank4.append(comp)
             print("Financial data unavailable.")
+            #setting as imputed value
+            df4=df40[['Variable']]#pd.DataFrame()#Para[Para['Segment']=='Financials'][['Variable', 'Imputation']]
         df4.rename(columns={'index':'Variable'}, inplace=True)
-
-        # combining
-        df=pd.concat([df,df4])
+        df42=df40.merge(df4, how='left', on='Variable')
+        df=pd.concat([df,df42])
+        df.reset_index(drop=True, inplace=True)
+        #print("fins")
+        #print(df)
+        
+        # If Imputated, then column name set as earliest for further fallback process
+        df.rename(columns={'Imputation':datetime(1971,1,1)}, inplace=True)
+        #print("imputation rename")
+        #print(df)
+        
         # fetching focus cols
-        df=df[df['Variable'].isin(list(Para['Variable']))].reset_index(drop=True)
-
-
+        #df=df[df['Variable'].isin(list(Para['Variable']))].reset_index(drop=True)
+        #print(df)
+        
         # extracting months
         #months=[ts.month for ts in df.columns[1:]]
         # saving sorted months for further fallback process
@@ -71,40 +97,44 @@ def FinancialScore(comp,Para):
         cols_sorted.sort()
         # replacing column names from timestamp to months
         #df.columns=['Variable']+months
-
+            
+        i=0
         # Missing imputation : Set a fallback value as next column
         for i in range(1,len(cols_sorted)):
             #print(cols_sorted[i])
             df[cols_sorted[i]] = df[cols_sorted[i]].fillna(df[cols_sorted[i-1]])
             #print(df)
-
+        
         latest_col=cols_sorted[i]
         #considering only column with latest value imputation
         data_comp0 = df[['Variable',latest_col]]
         data_comp=data_comp0.merge(Para, how='left', on='Variable')
-
+        #print(data_comp)
+        
         # checking if still any of the variable has missing value
         MissingFlag = list(data_comp.isna()[latest_col])
         if any(x is True for x in MissingFlag):
             #FinalScoreList.append("Data Missing")
-            print('======================== MISSING FOR : '+ comp+' ===============================')
+            print('Missing imputation for : '+ comp+' ===============================')
             print(data_comp0)
             Dict = {'Company': comp, 'Result': 'Data unavailable for some variable'} 
             print(Dict)
-        else:
-            ModelScore=256.85072+sum(data_comp[latest_col]*data_comp['Parameter'])
-            FinalScore=80-(ModelScore/11)
-            #print("Final score: "+str(FinalScore))
-            #FinalScoreList.append(FinalScore)
-            Dict = {'Company': comp, 'Result': FinalScore} 
-            print(Dict)
-            
+        
+        ModelScore=256.85072+sum(data_comp[latest_col]*data_comp['Parameter'])
+        FinalScore=85+(ModelScore/24)
+        #print("Model score: "+str(ModelScore))
+        #print("Final score: "+str(FinalScore))
+        #FinalScoreList.append(FinalScore)
+        Dict = {'Company': comp, 'Result': FinalScore} 
+        print(Dict)
+        
         FinalScore = round( FinalScore, 3 )
+    
     except:
         Dict = {'Company': comp, 'Result': 'Data unavailable'} 
         print(Dict)
         FinalScore = None
-        pass
+    
     return(FinalScore)
 
 
@@ -133,7 +163,7 @@ def analyze_sentiment(text):
 def get_news_sentiment(ticker):
     
     company = yf.Ticker(ticker)
-    
+        
     news_data = company.news
     
     sentiments = [analyze_sentiment(news['title']) for news in news_data]
