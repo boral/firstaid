@@ -6,3 +6,4 @@ nltk
 plotly
 google-generativeai
 openpyxl
+requests
